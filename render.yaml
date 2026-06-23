@@ -1,0 +1,80 @@
+# Render Blueprint for the NEPSE Trading backend.
+# Hosted API: https://stock-analysis-t6yt.onrender.com
+# Frontend (Vercel) that this API serves: https://stock-analysis-orcin-phi.vercel.app
+#
+# Deploy: connect this repo in the Render dashboard ("New > Blueprint").
+# Secrets marked `sync: false` must be filled in via the dashboard.
+
+services:
+  # ---- FastAPI web service ----
+  - type: web
+    name: stock-analysis-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: API_V1_PREFIX
+        value: /api/v1
+      # CORS: the hosted Vercel frontend origin.
+      - key: CORS_ORIGINS
+        value: https://stock-analysis-orcin-phi.vercel.app
+      - key: HSTS_ENABLED
+        value: "true"
+      # Security — generated once by Render, then persisted.
+      - key: SECRET_KEY
+        generateValue: true
+      # PostgreSQL (from the managed database below).
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: stock-analysis-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: stock-analysis-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: stock-analysis-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: stock-analysis-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: stock-analysis-db
+          property: database
+      # Redis (from the managed key-value store below).
+      - key: REDIS_HOST
+        fromService:
+          name: stock-analysis-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: stock-analysis-redis
+          type: redis
+          property: port
+      # External integrations — fill in via the dashboard if/when used.
+      - key: NEPSE_API_URL
+        sync: false
+      - key: ML_SERVICE_URL
+        sync: false
+
+  # ---- Redis (cache, rate limiting, pub/sub) ----
+  - type: redis
+    name: stock-analysis-redis
+    plan: starter
+    ipAllowList: []   # private network only
+
+databases:
+  - name: stock-analysis-db
+    databaseName: nepse_db
+    user: nepse
+    plan: starter

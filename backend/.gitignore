@@ -1,0 +1,8 @@
+# Local environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
