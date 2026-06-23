@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Semantic color tokens (RGB triplets for Tailwind's <alpha-value>). */
+:root {
+  --bg: 248 250 252;
+  --surface: 255 255 255;
+  --surface-2: 241 245 249;
+  --border: 226 232 240;
+  --fg: 15 23 42;
+  --muted: 100 116 139;
+  --brand: 37 99 235;
+  --up: 22 163 74;
+  --down: 220 38 38;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.dark {
+  --bg: 8 11 19;
+  --surface: 17 22 34;
+  --surface-2: 27 34 51;
+  --border: 39 48 68;
+  --fg: 226 232 240;
+  --muted: 148 163 184;
+  --brand: 59 130 246;
+  --up: 34 197 94;
+  --down: 239 68 68;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Live ticker marquee. */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ticker-track {
+  animation: ticker-scroll 40s linear infinite;
+}
+
+/* Thin, theme-aware scrollbars. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 9999px;
+}

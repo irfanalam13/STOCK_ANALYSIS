@@ -1,0 +1,19 @@
+{
+  "name": "NEPSE AI — Trading Dashboard",
+  "short_name": "NEPSE AI",
+  "description": "Real-time NEPSE market analytics, alerts, and paper trading.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
