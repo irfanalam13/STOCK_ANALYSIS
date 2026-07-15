@@ -5,9 +5,34 @@ This is the single source of truth for connection strings and tunables so the
 rest of the codebase never reads ``os.environ`` directly.
 """
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq-style query params that psycopg2 understands but asyncpg rejects; they
+# must be stripped from the async URL (SSL is re-applied via connect_args).
+_LIBPQ_ONLY_PARAMS = {"sslmode", "channel_binding", "options", "target_session_attrs"}
+_SSL_MODES = {"require", "verify-ca", "verify-full", "prefer", "allow"}
+
+
+def _normalize_db_url(raw: str, driver: str, *, keep_libpq_params: bool) -> str:
+    """Rewrite a full Postgres URL to use an explicit SQLAlchemy driver.
+
+    Accepts ``postgres://`` or ``postgresql://`` (as provided by Neon/Supabase/
+    Render/etc.) and returns e.g. ``postgresql+asyncpg://...``. For the async
+    driver, libpq-only query params (``sslmode`` etc.) are dropped because
+    asyncpg rejects them — SSL is re-established through connect_args instead.
+    """
+    parts = urlsplit(raw)
+    query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    if not keep_libpq_params:
+        query_pairs = [
+            (k, v) for k, v in query_pairs if k.lower() not in _LIBPQ_ONLY_PARAMS
+        ]
+    return urlunsplit(
+        parts._replace(scheme=f"postgresql+{driver}", query=urlencode(query_pairs))
+    )
 
 
 class Settings(BaseSettings):
@@ -22,6 +47,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # ---- PostgreSQL ----
+    # A full connection URL (e.g. from Render/Neon/Supabase) takes precedence
+    # over the individual POSTGRES_* fields below when set. The individual
+    # fields remain the default for local development.
+    DATABASE_URL: str = ""
     POSTGRES_USER: str = "nepse"
     POSTGRES_PASSWORD: str = "nepse_secret"
     POSTGRES_DB: str = "nepse_db"
@@ -127,6 +156,10 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def DATABASE_URL_ASYNC(self) -> str:
+        if self.DATABASE_URL:
+            return _normalize_db_url(
+                self.DATABASE_URL, "asyncpg", keep_libpq_params=False
+            )
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -136,9 +169,26 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL_SYNC(self) -> str:
         """Sync driver — used by Celery workers (Celery is not async-native)."""
+        if self.DATABASE_URL:
+            return _normalize_db_url(
+                self.DATABASE_URL, "psycopg2", keep_libpq_params=True
+            )
         return (
             f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def DB_SSL_REQUIRED(self) -> bool:
+        """True when the DATABASE_URL asks for SSL (asyncpg needs it via
+        connect_args since its ``sslmode`` param was stripped for the async URL)."""
+        if not self.DATABASE_URL:
+            return False
+        query = dict(parse_qsl(urlsplit(self.DATABASE_URL).query))
+        return (
+            query.get("sslmode", "").lower() in _SSL_MODES
+            or "channel_binding" in query
         )
 
     @computed_field  # type: ignore[prop-decorator]

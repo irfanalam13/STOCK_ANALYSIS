@@ -28,12 +28,16 @@ class Base(DeclarativeBase):
 
 
 # ---- Async (FastAPI) ----
+# asyncpg does not read libpq's ``sslmode`` from the URL, so when a hosted
+# DATABASE_URL requires SSL (Neon/Supabase/Render), enable it via connect_args.
+_async_connect_args = {"ssl": True} if settings.DB_SSL_REQUIRED else {}
 async_engine = create_async_engine(
     settings.DATABASE_URL_ASYNC,
     echo=settings.DEBUG,
     pool_pre_ping=True,
     pool_size=20,
     max_overflow=10,
+    connect_args=_async_connect_args,
 )
 AsyncSessionLocal = async_sessionmaker(
     bind=async_engine, expire_on_commit=False, class_=AsyncSession
